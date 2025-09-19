@@ -8,6 +8,7 @@ import { Clock, MessageSquare, Phone, Mail, User, Target, CheckCircle, ArrowDown
 import { OutreachTemplate } from './OutreachTemplate';
 import { VerticalTimeline } from './VerticalTimeline';
 import { ScenarioBranch } from './ScenarioBranch';
+import { ModeToggle } from './mode-toggle';
 
 interface Step {
   id: string;
@@ -291,6 +292,12 @@ const outreachPhases: Phase[] = [
 export const OutreachProcess: React.FC = () => {
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [activePhase, setActivePhase] = useState<string>('phase-0');
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
+
+  const handlePhaseSelect = (phaseId: string) => {
+    setActivePhase(phaseId);
+    setExpandedPhase(expandedPhase === phaseId ? null : phaseId);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -298,6 +305,11 @@ export const OutreachProcess: React.FC = () => {
       <div className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 py-20">
         <div className="absolute inset-0 opacity-50" 
              style={{backgroundImage: "url('data:image/svg+xml;charset=utf-8,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.02%22%3E%3Ccircle cx=%2230%22 cy=%2230%22 r=%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')"}} />
+        
+        {/* Theme Toggle */}
+        <div className="absolute top-6 right-6 z-10">
+          <ModeToggle />
+        </div>
         
         <div className="container mx-auto px-6 relative">
           <div className="text-center max-w-4xl mx-auto">
@@ -331,101 +343,163 @@ export const OutreachProcess: React.FC = () => {
         </div>
       </div>
 
-      {/* Timeline Overview */}
-      <VerticalTimeline phases={outreachPhases} activePhase={activePhase} onPhaseSelect={setActivePhase} />
-
-      {/* Main Content */}
+      {/* Interactive Timeline */}
       <div className="container mx-auto px-6 py-16">
-        <div className="space-y-12">
-          {outreachPhases.map((phase, phaseIndex) => (
-            <Card key={phase.id} className={`phase-card ${activePhase === phase.id ? 'pulse-glow' : ''}`}>
-              <CardHeader className="pb-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-r ${phase.color}`}>
-                      {phase.icon}
-                    </div>
-                    <div>
-                      <CardTitle className="text-2xl mb-2">{phase.title}</CardTitle>
-                      <Badge variant="secondary" className="mb-2">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {phase.timeline}
-                      </Badge>
-                      <p className="text-muted-foreground">{phase.description}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Phase</div>
-                    <div className="text-2xl font-bold text-primary">{phaseIndex}</div>
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold mb-4">Interactive Journey Timeline</h2>
+          <p className="text-muted-foreground">
+            Click any phase card to explore the detailed steps and strategies
+          </p>
+        </div>
+
+        <div className="relative max-w-4xl mx-auto">
+          {/* Main Timeline Line */}
+          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-accent-purple to-accent-blue opacity-30" />
+          
+          <div className="space-y-6">
+            {outreachPhases.map((phase, phaseIndex) => (
+              <div key={phase.id} className="relative">
+                {/* Timeline Dot */}
+                <div className="absolute left-6 z-10">
+                  <div className={`
+                    w-4 h-4 rounded-full border-2 transition-all duration-300
+                    ${activePhase === phase.id 
+                      ? 'bg-primary border-primary shadow-lg shadow-primary/50' 
+                      : 'bg-background border-border hover:border-primary'
+                    }
+                  `} />
+                </div>
+                
+                {/* Phase Number */}
+                <div className="absolute left-2 top-6 z-10">
+                  <div className={`
+                    w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                    ${activePhase === phase.id 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted text-muted-foreground'
+                    }
+                  `}>
+                    {phaseIndex}
                   </div>
                 </div>
-              </CardHeader>
 
-              <CardContent className="space-y-4">
-                {phase.steps.map((step, stepIndex) => (
-                  <div key={step.id} className="relative">
-                    {/* Connection Line */}
-                    {stepIndex < phase.steps.length - 1 && (
-                      <div className="connection-line flow-line h-8 top-12" />
-                    )}
-                    
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <div 
-                          className={`step-card ${selectedStep?.id === step.id ? 'active' : ''}`}
-                          onClick={() => setSelectedStep(step)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="timeline-dot" style={{ background: `var(--gradient-primary)` }}>
-                                {step.icon}
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-lg">{step.title}</h4>
-                                <p className="text-sm text-muted-foreground">{step.timeline}</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-3">
-                              {step.templates && (
-                                <Badge variant="outline" className="text-xs">
-                                  {step.templates.length} Template{step.templates.length > 1 ? 's' : ''}
-                                </Badge>
-                              )}
-                              <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3 pl-11">
-                            <p className="text-sm text-muted-foreground mb-2">{step.action}</p>
-                            <div className="flex items-center gap-4 text-xs">
-                              <span className="flex items-center gap-1">
-                                <MessageSquare className="w-3 h-3" />
-                                {step.comms}
-                              </span>
-                            </div>
-                          </div>
+                {/* Phase Card */}
+                <Card 
+                  className={`
+                    ml-16 cursor-pointer transition-all duration-300 hover:shadow-lg
+                    ${activePhase === phase.id 
+                      ? 'ring-2 ring-primary shadow-lg shadow-primary/25' 
+                      : 'hover:shadow-lg'
+                    }
+                  `}
+                  onClick={() => handlePhaseSelect(phase.id)}
+                >
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg bg-gradient-to-r ${phase.color}`}>
+                          {phase.icon}
                         </div>
-                      </DialogTrigger>
+                        <div>
+                          <h3 className="font-semibold text-lg">{phase.title}</h3>
+                          <Badge variant="outline" className="text-xs mt-1">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {phase.timeline}
+                          </Badge>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {phase.description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <ArrowDown className={`w-4 h-4 text-muted-foreground transition-transform duration-300 ${expandedPhase === phase.id ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                  </CardHeader>
 
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto glass-card">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center gap-3 text-xl">
-                            <div className={`p-2 rounded-lg bg-gradient-to-r ${phase.color}`}>
-                              {step.icon}
-                            </div>
-                            {step.title}
-                          </DialogTitle>
-                        </DialogHeader>
-                        
-                        <OutreachTemplate step={step} phase={phase} />
-                      </DialogContent>
-                    </Dialog>
+                  {/* Expandable Steps Content */}
+                  {expandedPhase === phase.id && (
+                    <CardContent className="pt-0 space-y-4 border-t border-border/50">
+                      <div className="text-sm font-medium text-muted-foreground mb-4">
+                        Phase Steps ({phase.steps.length} steps)
+                      </div>
+                      {phase.steps.map((step, stepIndex) => (
+                        <div key={step.id} className="relative">
+                          {/* Connection Line */}
+                          {stepIndex < phase.steps.length - 1 && (
+                            <div className="absolute left-4 top-8 w-0.5 h-8 bg-border" />
+                          )}
+                          
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <div 
+                                className="step-card bg-muted/30 hover:bg-muted/50 transition-all duration-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedStep(step);
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                      {step.icon}
+                                    </div>
+                                    <div>
+                                      <h4 className="font-medium text-sm">{step.title}</h4>
+                                      <p className="text-xs text-muted-foreground">{step.timeline}</p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    {step.templates && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {step.templates.length} Template{step.templates.length > 1 ? 's' : ''}
+                                      </Badge>
+                                    )}
+                                    <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-2 pl-11">
+                                  <p className="text-xs text-muted-foreground mb-1">{step.action}</p>
+                                  <div className="flex items-center gap-3 text-xs">
+                                    <span className="flex items-center gap-1">
+                                      <MessageSquare className="w-3 h-3" />
+                                      {step.comms}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </DialogTrigger>
+
+                            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto glass-card">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-3 text-xl">
+                                  <div className={`p-2 rounded-lg bg-gradient-to-r ${phase.color}`}>
+                                    {step.icon}
+                                  </div>
+                                  {step.title}
+                                </DialogTitle>
+                              </DialogHeader>
+                              
+                              <OutreachTemplate step={step} phase={phase} />
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      ))}
+                    </CardContent>
+                  )}
+                </Card>
+
+                {/* Connection Arrow */}
+                {phaseIndex < outreachPhases.length - 1 && (
+                  <div className="flex justify-center my-4">
+                    <ArrowDown className="w-4 h-4 text-muted-foreground animate-pulse" />
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
