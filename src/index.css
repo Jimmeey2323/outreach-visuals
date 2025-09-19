@@ -252,4 +252,13 @@ All colors MUST be HSL.
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Scenario Branch Styles */
+  .scenario-branch-card {
+    @apply relative border-l-4 border-amber-500/50 ml-4;
+  }
+  
+  .scenario-option-card {
+    @apply transition-all duration-300 hover:translate-x-1;
+  }
 }

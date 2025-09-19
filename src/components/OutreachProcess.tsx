@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, MessageSquare, Phone, Mail, User, Target, CheckCircle, ArrowDown, ArrowRight, Zap, Heart, Users, TrendingUp } from 'lucide-react';
 import { OutreachTemplate } from './OutreachTemplate';
-import { PhaseTimeline } from './PhaseTimeline';
+import { VerticalTimeline } from './VerticalTimeline';
+import { ScenarioBranch } from './ScenarioBranch';
 
 interface Step {
   id: string;
@@ -331,7 +332,7 @@ export const OutreachProcess: React.FC = () => {
       </div>
 
       {/* Timeline Overview */}
-      <PhaseTimeline phases={outreachPhases} activePhase={activePhase} onPhaseSelect={setActivePhase} />
+      <VerticalTimeline phases={outreachPhases} activePhase={activePhase} onPhaseSelect={setActivePhase} />
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-16">
