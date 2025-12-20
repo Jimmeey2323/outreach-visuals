@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ElementType } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,6 +26,8 @@ import {
   List,
   Loader2,
   Zap,
+  X,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +51,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { TICKET_TEMPLATES, type TicketTemplate as BaseTicketTemplate } from "@/components/ticket-templates";
@@ -60,7 +64,7 @@ interface TicketTemplate extends BaseTicketTemplate {
   lastUsed?: string;
 }
 
-const ICON_MAP: Record<string, React.ElementType> = {
+const ICON_MAP: Record<string, ElementType> = {
   Calendar,
   CreditCard,
   Users,
@@ -355,6 +359,8 @@ export default function Templates() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [selectedTemplateForForm, setSelectedTemplateForForm] = useState<TicketTemplate | null>(null);
+  const [templateFormData, setTemplateFormData] = useState<Record<string, string>>({});
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     description: "",
@@ -366,25 +372,25 @@ export default function Templates() {
   });
 
   // Fetch categories and studios for quick ticket creation
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
+  const { data: dbCategories = [] } = useQuery({
+    queryKey: ["categories"],
     queryFn: async () => {
-      const { data, error } = await supabase.from('categories').select('*').eq('isActive', true);
+      const { data, error } = await supabase.from("categories").select("*").eq("isActive", true);
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
   });
 
   const { data: studios = [] } = useQuery({
-    queryKey: ['studios'],
+    queryKey: ["studios"],
     queryFn: async () => {
-      const { data, error } = await supabase.from('studios').select('*').eq('isActive', true);
+      const { data, error } = await supabase.from("studios").select("*").eq("isActive", true);
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
   });
 
-  const templateCategories = [...new Set(templates.map(t => t.category))];
+  const templateCategories = useMemo(() => [...new Set(templates.map((t) => t.category))], [templates]);
 
   const filteredTemplates = templates.filter(template => {
     const matchesSearch = 
@@ -396,8 +402,112 @@ export default function Templates() {
     return matchesSearch && matchesCategory && matchesPriority;
   });
 
-  // Quick create ticket from template
-  const handleQuickCreate = async (template: TicketTemplate) => {
+  // Extract placeholders from template description
+  const extractPlaceholders = (template: TicketTemplate): string[] => {
+    const regex = /\[([^\]]+)\]/g;
+    const matches = new Set<string>();
+    let match;
+    const text = template.suggestedTitle + " " + template.suggestedDescription;
+    while ((match = regex.exec(text)) !== null) {
+      matches.add(match[1]);
+    }
+    return Array.from(matches);
+  };
+
+  // Open template form dialog
+  const handleOpenTemplateForm = (template: TicketTemplate) => {
+    setSelectedTemplateForForm(template);
+    const placeholders = extractPlaceholders(template);
+    const initialData: Record<string, string> = {};
+    placeholders.forEach(p => { initialData[p] = ""; });
+    setTemplateFormData(initialData);
+  };
+
+  // Create ticket with filled form data
+  const handleCreateTicketFromForm = async () => {
+    if (!selectedTemplateForForm) return;
+    setIsCreatingTicket(true);
+
+    try {
+      // Generate ticket number
+      const now = new Date();
+      const year = now.getFullYear().toString().slice(-2);
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const day = now.getDate().toString().padStart(2, '0');
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const ticketNumber = `TKT-${year}${month}${day}-${random}`;
+
+      // Replace placeholders in title and description
+      let title = selectedTemplateForForm.suggestedTitle;
+      let description = selectedTemplateForForm.suggestedDescription;
+      
+      Object.entries(templateFormData).forEach(([key, value]) => {
+        const regex = new RegExp(`\\[${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`, 'g');
+        title = title.replace(regex, value || `[${key}]`);
+        description = description.replace(regex, value || `[${key}]`);
+      });
+
+      const matchingCategory = dbCategories.find(
+        (c: any) =>
+          (c.name ?? "").toLowerCase().includes((selectedTemplateForForm.category ?? "").toLowerCase().split(" ")[0]) ||
+          (selectedTemplateForForm.category ?? "").toLowerCase().includes((c.name ?? "").toLowerCase()),
+      );
+
+      const defaultStudio = studios[0];
+
+      if (!matchingCategory || !defaultStudio) {
+        toast({
+          title: "Configuration Required",
+          description: "Please ensure categories and studios are set up in the database.",
+          variant: "destructive",
+        });
+        setIsCreatingTicket(false);
+        return;
+      }
+
+      const { data: ticket, error } = await supabase
+        .from('tickets')
+        .insert([{
+          ticketNumber,
+          title,
+          description,
+          categoryId: matchingCategory.id,
+          studioId: defaultStudio.id,
+          priority: selectedTemplateForForm.priority,
+          status: 'new',
+          source: 'template',
+          tags: selectedTemplateForForm.tags || [],
+          reportedByUserId: user?.id,
+          dynamicFieldData: {
+            templateId: selectedTemplateForForm.id,
+            templateName: selectedTemplateForForm.name,
+            formData: templateFormData,
+          },
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Ticket Created",
+        description: `Ticket ${ticketNumber} created successfully.`,
+      });
+
+      setSelectedTemplateForForm(null);
+      setTemplateFormData({});
+      navigate(`/tickets/${ticket.id}`);
+    } catch (error: any) {
+      console.error('Error creating ticket from template:', error);
+      toast({
+        title: "Error creating ticket",
+        description: error.message || "Failed to create ticket from template",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingTicket(false);
+    }
+  };
     if (isCreatingTicket) return;
     setIsCreatingTicket(true);
 
@@ -410,10 +520,10 @@ export default function Templates() {
       const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       const ticketNumber = `TKT-${year}${month}${day}-${random}`;
 
-      // Find matching category
-      const matchingCategory = categories.find(
-        (c: any) => c.name.toLowerCase().includes(template.category.toLowerCase().split(' ')[0]) ||
-             template.category.toLowerCase().includes(c.name.toLowerCase())
+      const matchingCategory = dbCategories.find(
+        (c: any) =>
+          (c.name ?? "").toLowerCase().includes((template.category ?? "").toLowerCase().split(" ")[0]) ||
+          (template.category ?? "").toLowerCase().includes((c.name ?? "").toLowerCase()),
       );
 
       // Get first studio as default
@@ -679,8 +789,10 @@ export default function Templates() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  {templateCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -823,25 +935,12 @@ export default function Templates() {
                     )}>
                       <Button
                         size="sm"
-                        onClick={() => handleQuickCreate(template)}
+                        onClick={() => handleOpenTemplateForm(template)}
                         disabled={isCreatingTicket}
                         className="rounded-lg bg-gradient-to-r from-primary to-secondary hover:opacity-90"
                       >
-                        {isCreatingTicket ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <Zap className="h-3 w-3 mr-1" />
-                        )}
-                        Quick Create
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleUseTemplate(template)}
-                        className="rounded-lg"
-                      >
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        Customize
+                        <Zap className="h-3 w-3 mr-1" />
+                        Use Template
                       </Button>
                       <Button
                         size="sm"
@@ -884,6 +983,56 @@ export default function Templates() {
           </CardContent>
         </Card>
       )}
+
+      {/* Template Form Dialog */}
+      <Dialog open={!!selectedTemplateForForm} onOpenChange={(open) => !open && setSelectedTemplateForForm(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedTemplateForForm && (
+                <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center bg-gradient-to-br", selectedTemplateForForm.color)}>
+                  {selectedTemplateForForm.icon && <selectedTemplateForForm.icon className="h-4 w-4 text-white" />}
+                </div>
+              )}
+              {selectedTemplateForForm?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a ticket from this template
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[50vh] pr-4">
+            <div className="space-y-4 py-4">
+              {selectedTemplateForForm && extractPlaceholders(selectedTemplateForForm).map((placeholder) => (
+                <div key={placeholder} className="space-y-2">
+                  <Label>{placeholder}</Label>
+                  <Input
+                    placeholder={`Enter ${placeholder.toLowerCase()}`}
+                    value={templateFormData[placeholder] || ""}
+                    onChange={(e) => setTemplateFormData(prev => ({ ...prev, [placeholder]: e.target.value }))}
+                    className="rounded-xl"
+                  />
+                </div>
+              ))}
+              
+              {selectedTemplateForForm && extractPlaceholders(selectedTemplateForForm).length === 0 && (
+                <p className="text-sm text-muted-foreground">This template has no fields to fill. Click Create to proceed.</p>
+              )}
+            </div>
+          </ScrollArea>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedTemplateForForm(null)} className="gap-2">
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTicketFromForm} disabled={isCreatingTicket} className="gap-2">
+              {isCreatingTicket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Create Ticket
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

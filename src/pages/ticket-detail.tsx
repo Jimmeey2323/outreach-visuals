@@ -22,6 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +31,14 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,9 +56,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PriorityBadge } from "@/components/priority-badge";
 import { StatusBadge } from "@/components/status-badge";
+import { AssignAssociateModal } from "@/components/assign-associate-modal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/integrations/supabase/client";
 import { STATUSES, PRIORITIES, STUDIOS, DEPARTMENTS } from "@/lib/constants";
 import type {
@@ -77,34 +87,67 @@ export default function TicketDetail() {
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [activeTab, setActiveTab] = useState("comments");
   const [resolutionSummary, setResolutionSummary] = useState("");
-  const [isClosingTicket, setIsClosingTicket] = useState(false);
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [isJumpingToResolution, setIsJumpingToResolution] = useState(false);
 
   const { data: ticket, isLoading } = useQuery<TicketWithRelations>({
-    queryKey: ["/api/tickets", ticketId],
+    queryKey: ['ticket-detail', ticketId],
     enabled: !!ticketId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tickets')
+        .select(`
+          *,
+          category:categories(id, name, code, icon, color),
+          subcategory:subcategories(id, name, code),
+          studio:studios(id, name, code),
+          assignedTo:users!tickets_assignedToUserId_fkey(id, firstName, lastName, displayName, email),
+          reportedBy:users!tickets_reportedByUserId_fkey(id, firstName, lastName, displayName),
+          comments:ticketComments(*, user:users!ticketComments_userId_fkey(id, firstName, lastName, displayName)),
+          history:ticketHistory(*)
+        `)
+        .eq('id', ticketId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
   });
 
-  // Check if current user is the assigned owner
+  // Check if current user is the assigned owner or ticket reporter
   const isTicketOwner = user?.id && ticket?.assignedToUserId === user.id;
+  const isTicketReporter = user?.id && ticket?.reportedByUserId === user.id;
+  const canAssignAssociate = isTicketOwner || isTicketReporter || user?.role === 'admin' || user?.role === 'manager';
   const canCloseTicket = isTicketOwner || user?.role === 'admin' || user?.role === 'manager';
+
+  const invalidateTicketCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ["ticket-detail", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["recent-tickets"] });
+    queryClient.invalidateQueries({ queryKey: ["urgent-tickets"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+  };
 
   // Close ticket mutation
   const closeTicketMutation = useMutation({
     mutationFn: async (data: { resolutionSummary: string }) => {
       const { error } = await supabase
-        .from('tickets')
+        .from("tickets")
         .update({
-          status: 'closed',
+          status: "closed",
           resolutionSummary: data.resolutionSummary,
           closedAt: new Date().toISOString(),
           resolvedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
-        .eq('id', ticketId);
+        .eq("id", ticketId);
       if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "Ticket closed successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketId] });
+      invalidateTicketCaches();
       setResolutionSummary("");
     },
     onError: () => {
@@ -117,18 +160,20 @@ export default function TicketDetail() {
       toast({ title: "Resolution summary is required", variant: "destructive" });
       return;
     }
-    setIsClosingTicket(true);
     closeTicketMutation.mutate({ resolutionSummary: resolutionSummary.trim() });
-    setIsClosingTicket(false);
   };
 
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
-      return apiRequest("PATCH", `/api/tickets/${ticketId}`, { status });
+      const { error } = await supabase
+        .from("tickets")
+        .update({ status, updatedAt: new Date().toISOString() })
+        .eq("id", ticketId);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "Status updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketId] });
+      invalidateTicketCaches();
     },
     onError: () => {
       toast({ title: "Failed to update status", variant: "destructive" });
@@ -137,26 +182,83 @@ export default function TicketDetail() {
 
   const updatePriorityMutation = useMutation({
     mutationFn: async (priority: string) => {
-      return apiRequest("PATCH", `/api/tickets/${ticketId}`, { priority });
+      const { error } = await supabase
+        .from("tickets")
+        .update({ priority, updatedAt: new Date().toISOString() })
+        .eq("id", ticketId);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "Priority updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketId] });
+      invalidateTicketCaches();
     },
     onError: () => {
       toast({ title: "Failed to update priority", variant: "destructive" });
     },
   });
 
+  const escalateTicketMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("tickets")
+        .update({
+          escalatedAt: new Date().toISOString(),
+          priority: "high",
+          status: "assigned",
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", ticketId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Ticket escalated" });
+      invalidateTicketCaches();
+    },
+    onError: () => {
+      toast({ title: "Failed to escalate ticket", variant: "destructive" });
+    },
+  });
+
+  const updateTicketMutation = useMutation({
+    mutationFn: async (data: { title: string; description: string }) => {
+      const { error } = await supabase
+        .from("tickets")
+        .update({
+          title: data.title,
+          description: data.description,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", ticketId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Ticket updated" });
+      setIsEditOpen(false);
+      invalidateTicketCaches();
+    },
+    onError: () => {
+      toast({ title: "Failed to update ticket", variant: "destructive" });
+    },
+  });
+
   const addCommentMutation = useMutation({
     mutationFn: async (data: { content: string; isInternal: boolean }) => {
-      return apiRequest("POST", `/api/tickets/${ticketId}/comments`, data);
+      if (!user?.id) throw new Error("User not authenticated");
+      const { error } = await supabase
+        .from('ticketComments')
+        .insert({
+          ticketId,
+          userId: user.id,
+          content: data.content,
+          isInternal: data.isInternal,
+        });
+      if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "Comment added" });
       setNewComment("");
       setIsInternalNote(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
     },
     onError: () => {
       toast({ title: "Failed to add comment", variant: "destructive" });
@@ -207,6 +309,50 @@ export default function TicketDetail() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Ticket</DialogTitle>
+            <DialogDescription>Update the title and issue description.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="min-h-32"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                updateTicketMutation.mutate({
+                  title: editTitle.trim(),
+                  description: editDescription.trim(),
+                })
+              }
+              disabled={!editTitle.trim() || !editDescription.trim() || updateTicketMutation.isPending}
+            >
+              {updateTicketMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center gap-4 flex-wrap">
         <Button
           variant="ghost"
@@ -229,7 +375,22 @@ export default function TicketDetail() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" data-testid="button-edit-ticket">
+          {canAssignAssociate && (
+            <AssignAssociateModal
+              ticketId={ticketId!}
+              currentAssigneeId={ticket.assignedToUserId}
+            />
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="button-edit-ticket"
+            onClick={() => {
+              setEditTitle(ticket.title ?? "");
+              setEditDescription(ticket.description ?? "");
+              setIsEditOpen(true);
+            }}
+          >
             <Edit2 className="h-4 w-4 mr-2" />
             Edit
           </Button>
@@ -244,10 +405,24 @@ export default function TicketDetail() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Assign to Team</DropdownMenuItem>
-              <DropdownMenuItem>Escalate</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  toast({ title: "Escalating…" });
+                  escalateTicketMutation.mutate();
+                }}
+              >
+                Escalate
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => {
+                  document.getElementById("ticket-resolution")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+                }}
+              >
                 Close Ticket
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -674,7 +849,7 @@ export default function TicketDetail() {
 
           {/* Resolution Section - Only visible to ticket owner/admin */}
           {canCloseTicket && ticket.status !== 'closed' && (
-            <Card className="border-primary/50 bg-primary/5">
+            <Card id="ticket-resolution" className="border-primary/50 bg-primary/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Lock className="h-5 w-5 text-primary" />

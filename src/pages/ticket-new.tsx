@@ -71,7 +71,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { MomenceClientSearch } from "@/components/momence-client-search";
-import { MomenceSessionSelector } from "@/components/momence-session-selector";
+import { ClassSelector, type ClassSession } from "@/components/class-selector";
 import { AIFeedbackChatbot } from "@/components/ai-feedback-chatbot";
 import { TICKET_TEMPLATES } from "@/components/ticket-templates";
 import { supabase } from "@/integrations/supabase/client";
@@ -237,7 +237,7 @@ export default function NewTicket() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [selectedMomenceClient, setSelectedMomenceClient] = useState<any>(null);
-  const [selectedMomenceSession, setSelectedMomenceSession] = useState<any>(null);
+  const [selectedMomenceSession, setSelectedMomenceSession] = useState<ClassSession | null>(null);
   const [showAIChatbot, setShowAIChatbot] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   
@@ -527,7 +527,7 @@ export default function NewTicket() {
     }
   };
 
-  const handleMomenceSessionSelect = (session: any) => {
+  const handleMomenceSessionSelect = (session: ClassSession | null) => {
     setSelectedMomenceSession(session);
     if (session) {
       // Set class details
@@ -543,7 +543,6 @@ export default function NewTicket() {
       if (session.teacher) {
         const trainerFullName = `${session.teacher.firstName || ''} ${session.teacher.lastName || ''}`.trim();
         form.setValue("trainerName", trainerFullName);
-        form.setValue("trainerEmail", session.teacher.email || "");
         
         // Open trainer section if we have trainer info
         if (trainerFullName) {
@@ -558,7 +557,7 @@ export default function NewTicket() {
       setClassDetailsOpen(true);
       
       toast({
-        title: "Session Selected",
+        title: "Class Selected",
         description: `Class "${session.name}" details have been filled in.`,
       });
     }
@@ -1105,6 +1104,34 @@ export default function NewTicket() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
+                      name="studioId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location / Studio *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="rounded-xl bg-background">
+                                <SelectValue placeholder={studiosLoading ? "Loading..." : "Select location"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-popover border border-border z-50">
+                              {studios.map((studio) => (
+                                <SelectItem key={studio.id} value={studio.id}>
+                                  <span className="flex items-center gap-2">
+                                    <MapPin className="h-3 w-3" />
+                                    {studio.name}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="categoryId"
                       render={({ field }) => (
                         <FormItem>
@@ -1119,8 +1146,8 @@ export default function NewTicket() {
                               {categories.map((cat) => (
                                 <SelectItem key={cat.id} value={cat.id}>
                                   <span className="flex items-center gap-2">
-                                    <span 
-                                      className="w-2 h-2 rounded-full" 
+                                    <span
+                                      className="w-2 h-2 rounded-full"
                                       style={{ backgroundColor: cat.color || '#3B82F6' }}
                                     />
                                     {cat.name}
@@ -1160,34 +1187,6 @@ export default function NewTicket() {
                         )}
                       />
                     )}
-
-                    <FormField
-                      control={form.control}
-                      name="studioId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location / Studio *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="rounded-xl bg-background">
-                                <SelectValue placeholder={studiosLoading ? "Loading..." : "Select location"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-popover border border-border z-50">
-                              {studios.map((studio) => (
-                                <SelectItem key={studio.id} value={studio.id}>
-                                  <span className="flex items-center gap-2">
-                                    <MapPin className="h-3 w-3" />
-                                    {studio.name}
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
 
                   {/* Priority Selection */}
@@ -1441,9 +1440,19 @@ export default function NewTicket() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <CardContent className="space-y-4 pt-0">
-                      <MomenceSessionSelector
-                        onSessionSelect={handleMomenceSessionSelect}
-                        selectedSession={selectedMomenceSession}
+                      <ClassSelector
+                        onClassSelect={handleMomenceSessionSelect}
+                        selectedClass={selectedMomenceSession}
+                        label="Select Class from Momence"
+                        placeholder="Search by class name, date, time, teacher"
+                        locationId={(() => {
+                          const selectedStudio = studios.find((s) => s.id === form.getValues("studioId"));
+                          const name = (selectedStudio?.name || "").toLowerCase();
+                          if (name.includes("kwality") && name.includes("kemps")) return 9030;
+                          if (name.includes("supreme") && name.includes("bandra")) return 29821;
+                          return undefined;
+                        })()}
+                        disabled={!form.getValues("studioId")}
                       />
                       
                       <Separator />
@@ -1531,7 +1540,9 @@ export default function NewTicket() {
                                 </FormControl>
                                 <SelectContent className="bg-popover border border-border z-50 max-h-60">
                                   {TRAINERS.map((trainer) => (
-                                    <SelectItem key={trainer} value={trainer}>{trainer}</SelectItem>
+                                    <SelectItem key={trainer.id} value={trainer.name}>
+                                      {trainer.name}
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>

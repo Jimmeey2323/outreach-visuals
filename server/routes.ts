@@ -47,7 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/teams', async (req, res) => {
+  app.get('/api/teams', isAuthenticated, async (req, res) => {
     try {
       // Return empty array for now since database is not connected
       res.json([]);
@@ -91,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/studios', async (req, res) => {
+  app.get('/api/studios', isAuthenticated, async (req, res) => {
     try {
       const studios = await storage.getStudios();
       res.json(studios);
@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/categories', async (req, res) => {
+  app.get('/api/categories', isAuthenticated, async (req, res) => {
     try {
       if (!supabase) return res.status(500).json({ message: 'Supabase not configured' });
       
@@ -182,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/subcategories', async (req, res) => {
+  app.get('/api/subcategories', isAuthenticated, async (req, res) => {
     try {
       if (!supabase) return res.status(500).json({ message: 'Supabase not configured' });
       
@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/tickets', async (req, res) => {
+  app.get('/api/tickets', isAuthenticated, async (req, res) => {
     try {
       if (!supabase) return res.status(500).json({ message: 'Supabase not configured' });
       
@@ -238,7 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/tickets/:id', async (req, res) => {
+  app.get('/api/tickets/:id', isAuthenticated, async (req, res) => {
     try {
       // Prefer Supabase (consistent with list endpoint), fall back to storage if needed
       if (supabase) {
@@ -398,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/tickets/:id/comments', async (req, res) => {
+  app.get('/api/tickets/:id/comments', isAuthenticated, async (req, res) => {
     try {
       const comments = await storage.getTicketComments(req.params.id);
       res.json(comments);
@@ -424,7 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/tickets/:id/attachments', async (req, res) => {
+  app.get('/api/tickets/:id/attachments', isAuthenticated, async (req, res) => {
     try {
       const attachments = await storage.getTicketAttachments(req.params.id);
       res.json(attachments);
@@ -434,7 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/tickets/:id/history', async (req, res) => {
+  app.get('/api/tickets/:id/history', isAuthenticated, async (req, res) => {
     try {
       const history = await storage.getTicketHistory(req.params.id);
       res.json(history);
@@ -479,7 +479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/dashboard/stats', async (req, res) => {
+  app.get('/api/dashboard/stats', isAuthenticated, async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -499,7 +499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/analytics', async (req, res) => {
+  app.get('/api/analytics', isAuthenticated, async (req, res) => {
     try {
       const analytics = await storage.getAnalyticsData();
       res.json(analytics);
@@ -518,13 +518,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Proxy endpoints for Momence to avoid exposing API token in the browser and bypass CORS
-  app.get('/api/momence/search', async (req, res) => {
+  app.get('/api/momence/search', isAuthenticated, async (req, res) => {
     try {
       const q = String(req.query.q || '').trim();
       if (!q) return res.json({ payload: [] });
 
-      const baseURL = process.env.MOMENCE_API_BASE_URL || process.env.VITE_MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
-      const token = process.env.MOMENCE_AUTH_TOKEN || process.env.VITE_MOMENCE_AUTH_TOKEN || '';
+      const baseURL = process.env.MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
+      const token = process.env.MOMENCE_AUTH_TOKEN || '';
 
       const url = `${baseURL}/host/members?page=0&pageSize=100&sortOrder=ASC&sortBy=firstName&query=${encodeURIComponent(q)}`;
 
@@ -551,13 +551,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/momence/members/:id', async (req, res) => {
+  app.get('/api/momence/members/:id', isAuthenticated, async (req, res) => {
     try {
       const id = String(req.params.id || '').trim();
       if (!id) return res.status(400).json({ message: 'Missing member id' });
 
-      const baseURL = process.env.MOMENCE_API_BASE_URL || process.env.VITE_MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
-      const token = process.env.MOMENCE_AUTH_TOKEN || process.env.VITE_MOMENCE_AUTH_TOKEN || '';
+      const baseURL = process.env.MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
+      const token = process.env.MOMENCE_AUTH_TOKEN || '';
 
       const url = `${baseURL}/host/members/${encodeURIComponent(id)}`;
 
@@ -585,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all categories with their subcategories
-  app.get('/api/categories', async (req, res) => {
+  app.get('/api/categories', isAuthenticated, async (req, res) => {
     try {
       if (!supabase) {
         return res.status(500).json({ message: 'Supabase client not initialized' });
@@ -605,7 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subcategories for a specific category (accepts category name or ID)
-  app.get('/api/categories/:categoryId/subcategories', async (req, res) => {
+  app.get('/api/categories/:categoryId/subcategories', isAuthenticated, async (req, res) => {
     try {
       const { categoryId } = req.params;
 
@@ -646,7 +646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get dynamic fields for a category and subcategory (accepts category name or ID)
-  app.get('/api/categories/:categoryId/fields', async (req, res) => {
+  app.get('/api/categories/:categoryId/fields', isAuthenticated, async (req, res) => {
     try {
       const { categoryId } = req.params;
       const { subcategoryId } = req.query;
@@ -718,7 +718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fallback: Get all fields mapping (for compatibility)
-  app.get('/api/field-mapping', async (req, res) => {
+  app.get('/api/field-mapping', isAuthenticated, async (req, res) => {
     try {
       if (!supabase) {
         return res.status(500).json({ message: 'Supabase client not initialized' });
@@ -781,14 +781,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Momence Sessions endpoints
-  app.get('/api/momence/sessions', async (req, res) => {
+  app.get('/api/momence/sessions', isAuthenticated, async (req, res) => {
     try {
       const locationId = req.query.locationId ? String(req.query.locationId).trim() : undefined;
       const page = req.query.page ? parseInt(String(req.query.page)) : 0;
       const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : 200;
 
-      const baseURL = process.env.MOMENCE_API_BASE_URL || process.env.VITE_MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
-      const token = process.env.MOMENCE_AUTH_TOKEN || process.env.VITE_MOMENCE_AUTH_TOKEN || '';
+      const baseURL = process.env.MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
+      const token = process.env.MOMENCE_AUTH_TOKEN || '';
 
       // Build URL with optional locationId
       let url = `${baseURL}/host/sessions?page=${page}&pageSize=${pageSize}&sortOrder=DESC&sortBy=startsAt&includeCancelled=false`;
@@ -826,13 +826,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/momence/sessions/:id', async (req, res) => {
+  app.get('/api/momence/sessions/:id', isAuthenticated, async (req, res) => {
     try {
       const id = String(req.params.id || '').trim();
       if (!id) return res.status(400).json({ message: 'Missing session id' });
 
-      const baseURL = process.env.MOMENCE_API_BASE_URL || process.env.VITE_MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
-      const token = process.env.MOMENCE_AUTH_TOKEN || process.env.VITE_MOMENCE_AUTH_TOKEN || '';
+      const baseURL = process.env.MOMENCE_API_BASE_URL || 'https://api.momence.com/api/v2';
+      const token = process.env.MOMENCE_AUTH_TOKEN || '';
 
       const url = `${baseURL}/host/sessions/${encodeURIComponent(id)}`;
 
@@ -860,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sentiment Analysis endpoint
-  app.post('/api/analyze-sentiment', async (req, res) => {
+  app.post('/api/analyze-sentiment', isAuthenticated, async (req, res) => {
     try {
       const { title, description, clientMood } = req.body;
 
@@ -889,7 +889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add sample fields for testing (temporary endpoint)
-  app.post('/api/admin/add-sample-fields', async (req, res) => {
+  app.post('/api/admin/add-sample-fields', isAuthenticated, async (req, res) => {
     try {
       if (!supabase) return res.status(500).json({ message: 'Supabase not configured' });
 
@@ -958,7 +958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Migrate CSV fields to database (Run once)
-  app.post('/api/admin/migrate-fields', async (req, res) => {
+  app.post('/api/admin/migrate-fields', isAuthenticated, async (req, res) => {
     try {
       // Ensure field types exist
       const fieldTypes = [

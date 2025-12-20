@@ -8,12 +8,21 @@ const corsHeaders = {
 };
 
 interface MomenceRequest {
-  action: "searchMembers" | "getMemberSessions" | "getMemberMemberships" | "getSessions" | "getSessionDetails" | "getMemberDetails";
+  action:
+    | "searchMembers"
+    | "getMemberSessions"
+    | "getMemberMemberships"
+    | "getSessions"
+    | "getSessionDetails"
+    | "getMemberDetails"
+    | "getSessionBookings";
   query?: string;
   memberId?: number;
   sessionId?: number;
   page?: number;
   pageSize?: number;
+  /** Optional Momence location filter */
+  locationId?: number;
 }
 
 // Token cache to avoid re-authenticating on every request
@@ -88,7 +97,7 @@ serve(async (req) => {
       throw new Error("Failed to authenticate with Momence API");
     }
 
-    const { action, query, memberId, sessionId, page = 0, pageSize = 100 }: MomenceRequest = await req.json();
+    const { action, query, memberId, sessionId, page = 0, pageSize = 100, locationId }: MomenceRequest = await req.json();
     
     const headers = {
       "accept": "application/json",
@@ -127,19 +136,27 @@ serve(async (req) => {
         response = await fetch(url, { headers });
         break;
 
-      case "getSessions":
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const startsBefore = tomorrow.toISOString();
-        url = `${MOMENCE_BASE_URL}/host/sessions?page=${page}&pageSize=${pageSize}&sortOrder=DESC&sortBy=startsAt&includeCancelled=false&startsBefore=${encodeURIComponent(startsBefore)}`;
-        console.log("Getting all sessions");
+      case "getSessions": {
+        // Get sessions up to today's date in ISO format
+        const todaysDate = new Date().toISOString();
+        const locationParam = locationId ? `&locationId=${encodeURIComponent(String(locationId))}` : "";
+        url = `${MOMENCE_BASE_URL}/host/sessions?page=${page}&pageSize=${pageSize}&sortOrder=DESC&sortBy=startsAt&includeCancelled=false&startBefore=${encodeURIComponent(todaysDate)}${locationParam}`;
+        console.log("Getting sessions with startBefore:", todaysDate, "locationId:", locationId ?? "(none)");
         response = await fetch(url, { headers });
         break;
+      }
 
       case "getSessionDetails":
         if (!sessionId) throw new Error("sessionId is required");
         url = `${MOMENCE_BASE_URL}/host/sessions/${sessionId}`;
         console.log("Getting session details:", sessionId);
+        response = await fetch(url, { headers });
+        break;
+
+      case "getSessionBookings":
+        if (!sessionId) throw new Error("sessionId is required");
+        url = `${MOMENCE_BASE_URL}/host/sessions/${sessionId}/bookings?page=${page}&pageSize=${pageSize}&sortOrder=DESC&sortBy=firstName&includeCancelled=true`;
+        console.log("Getting session bookings:", sessionId);
         response = await fetch(url, { headers });
         break;
 
