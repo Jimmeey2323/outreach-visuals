@@ -5,25 +5,24 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ring-offset-2 ring-offset-background disabled:pointer-events-none disabled:opacity-50 disabled:brightness-75 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-95 active:shadow-sm",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 relative overflow-hidden",
   {
     variants: {
       variant: {
-        default:
-          "bg-accent text-accent-foreground border border-accent/50 shadow-sm hover:shadow-glow hover:brightness-110 active:brightness-100",
+        default: "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md hover:shadow-lg hover:from-blue-700 hover:to-purple-700 hover:-translate-y-1 hover:scale-105 border border-blue-500/30",
         destructive:
-          "bg-destructive text-destructive-foreground border border-destructive/50 shadow-sm hover:shadow-md hover:brightness-110 active:brightness-100",
+          "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md hover:shadow-lg hover:from-red-700 hover:to-red-800 hover:-translate-y-1 hover:scale-105 border border-red-500/30",
         outline:
-          "border border-input/50 bg-background/30 backdrop-blur-xs hover:bg-background/70 hover:border-accent/60 shadow-xs hover:shadow-sm",
+          "border border-slate-300/60 bg-white hover:bg-slate-50 hover:border-slate-400 hover:-translate-y-1 hover:scale-105 hover:shadow-md text-slate-700 hover:shadow-blue-200/40",
         secondary:
-          "bg-secondary/80 text-secondary-foreground border border-secondary/50 shadow-sm hover:shadow-md hover:brightness-110",
-        ghost:
-          "border border-transparent text-accent hover:bg-accent/15 hover:text-accent-foreground",
+          "bg-gradient-to-r from-slate-100 to-slate-200 text-slate-800 shadow-sm hover:shadow-md hover:from-slate-200 hover:to-slate-300 hover:-translate-y-1 hover:scale-105 border border-slate-300/60",
+        ghost: "hover:bg-blue-50/80 hover:text-blue-700 hover:-translate-y-0.5 border border-transparent hover:border-blue-200/50",
+        link: "text-blue-600 underline-offset-4 hover:underline hover:text-blue-700",
       },
       size: {
-        default: "min-h-10 px-4 py-2",
-        sm: "min-h-8 rounded-md px-3 text-xs",
-        lg: "min-h-11 rounded-lg px-6 py-3",
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
         icon: "h-10 w-10",
       },
     },
@@ -31,7 +30,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 )
 
 export interface ButtonProps
@@ -50,7 +49,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       />
     )
-  },
+  }
 )
 Button.displayName = "Button"
 

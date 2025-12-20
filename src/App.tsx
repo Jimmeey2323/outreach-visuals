@@ -1,162 +1,151 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+
+import * as React from "react";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { useAuth } from "@/hooks/useAuth";
-import { Menu, LogOut, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { lazy, Suspense } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { UniversalLoader } from "@/components/ui/UniversalLoader";
+import { GlobalLoader } from "@/components/ui/GlobalLoader";
+import { GlobalCommandPalette } from "@/components/ui/GlobalCommandPalette";
+import { PageTransition } from "@/components/ui/PageTransition";
+import { usePerformanceOptimization } from "@/hooks/usePerformanceOptimization";
+import { useRouteChangeLoader } from "@/hooks/useRouteChangeLoader";
+import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
+import { MetricsTablesRegistryProvider } from '@/contexts/MetricsTablesRegistryContext';
+import { SectionNavigationProvider } from "@/contexts/SectionNavigationContext";
+import { RouteLoadingWrapper } from "@/components/RouteLoadingWrapper";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
-// Lazy load page components for code splitting
-const NotFound = lazy(() => import("@/pages/not-found"));
-const Landing = lazy(() => import("@/pages/landing"));
-const Dashboard = lazy(() => import("@/pages/dashboard"));
-const Tickets = lazy(() => import("@/pages/tickets"));
-const NewTicket = lazy(() => import("@/pages/ticket-new"));
-const TicketDetail = lazy(() => import("@/pages/ticket-detail"));
-const Analytics = lazy(() => import("@/pages/analytics"));
-const Teams = lazy(() => import("@/pages/teams"));
-const Studios = lazy(() => import("@/pages/studios"));
-const Categories = lazy(() => import("@/pages/categories"));
-const Notifications = lazy(() => import("@/pages/notifications"));
-const Settings = lazy(() => import("@/pages/settings"));
-const Templates = lazy(() => import("@/pages/templates"));
-const TrainerFeedback = lazy(() => import("@/pages/trainer-feedback"));
+// Optimized lazy loading with preloading for critical pages
+const Index = React.lazy(() => 
+  import("./pages/Index").then(module => ({ default: module.default }))
+);
+const ExecutiveSummary = React.lazy(() => 
+  import("./pages/ExecutiveSummary").then(module => ({ default: module.default }))
+);
+const SalesAnalytics = React.lazy(() => 
+  import("./pages/SalesAnalytics").then(module => ({ default: module.default }))
+);
+const FunnelLeads = React.lazy(() => 
+  import("./pages/FunnelLeads").then(module => ({ default: module.default }))
+);
+const ClientRetention = React.lazy(() => 
+  import("./pages/ClientRetention").then(module => ({ default: module.default }))
+);
+const TrainerPerformance = React.lazy(() => 
+  import("./pages/TrainerPerformance").then(module => ({ default: module.default }))
+);
+const ClassAttendance = React.lazy(() => 
+  import("./pages/ClassAttendance").then(module => ({ default: module.default }))
+);
+const ClassFormatsComparison = React.lazy(() => 
+  import("./pages/ClassFormatsComparison").then(module => ({ default: module.default }))
+);
+const DiscountsPromotions = React.lazy(() => 
+  import("./pages/DiscountsPromotions").then(module => ({ default: module.default }))
+);
+const Sessions = React.lazy(() => 
+  import("./pages/Sessions").then(module => ({ default: module.default }))
+);
+const OutlierAnalysis = React.lazy(() => 
+  import("./pages/OutlierAnalysis").then(module => ({ default: module.default }))
+);
+const ExpirationAnalytics = React.lazy(() => 
+  import("./pages/ExpirationAnalytics").then(module => ({ default: module.default }))
+);
+const LateCancellations = React.lazy(() => 
+  import("./pages/LateCancellations").then(module => ({ default: module.default }))
+);
+const PatternsAndTrends = React.lazy(() => 
+  import("./pages/PatternsAndTrends").then(module => ({ default: module.default }))
+);
+const LocationReport = React.lazy(() => 
+  import("./pages/LocationReport").then(module => ({ default: module.default }))
+);
+const NotFound = React.lazy(() => 
+  import("./pages/NotFound").then(module => ({ default: module.default }))
+);
 
-// Loading fallback component
-function PageLoader() {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 10 * 60 * 1000, // 10 minutes (increased for better caching)
+      gcTime: 60 * 60 * 1000,    // 60 minutes (increased cache retention)
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry: 1,
+      networkMode: 'online',
+      refetchInterval: false,
+      refetchIntervalInBackground: false,
+    },
+    mutations: {
+      retry: 1,
+      networkMode: 'online',
+    },
+  },
+});
+
+// Inner component that uses the route change loader hook
+const AppRoutes = () => {
+  useRouteChangeLoader();
+  
   return (
-    <div className="flex h-64 items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-    </div>
+    <>
+      <GlobalLoader />
+      <GlobalCommandPalette />
+      <RouteLoadingWrapper>
+        <React.Suspense fallback={<div className="fixed inset-0 z-[9999] bg-white" />}>
+          <PageTransition>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/executive-summary" element={<ExecutiveSummary />} />
+              <Route path="/sales-analytics" element={<SalesAnalytics />} />
+              <Route path="/funnel-leads" element={<FunnelLeads />} />
+              <Route path="/client-retention" element={<ClientRetention />} />
+              <Route path="/trainer-performance" element={<TrainerPerformance />} />
+              <Route path="/class-attendance" element={<ClassAttendance />} />
+              <Route path="/class-formats" element={<ClassFormatsComparison />} />
+              <Route path="/powercycle-vs-barre" element={<ClassFormatsComparison />} />
+              <Route path="/discounts-promotions" element={<DiscountsPromotions />} />
+              <Route path="/sessions" element={<Sessions />} />
+              <Route path="/outlier-analysis" element={<OutlierAnalysis />} />
+              <Route path="/expiration-analytics" element={<ExpirationAnalytics />} />
+              <Route path="/late-cancellations" element={<LateCancellations />} />
+              <Route path="/patterns-trends" element={<PatternsAndTrends />} />
+              <Route path="/location-report" element={<LocationReport />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </PageTransition>
+        </React.Suspense>
+      </RouteLoadingWrapper>
+    </>
   );
-}
+};
 
-function AuthenticatedRoutes() {
+const App = () => {
+  usePerformanceOptimization();
+  
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/tickets" component={Tickets} />
-        <Route path="/tickets/new" component={NewTicket} />
-        <Route path="/tickets/:id" component={TicketDetail} />
-        <Route path="/analytics" component={Analytics} />
-        <Route path="/templates" component={Templates} />
-        <Route path="/trainer-feedback" component={TrainerFeedback} />
-        <Route path="/teams" component={Teams} />
-        <Route path="/studios" component={Studios} />
-        <Route path="/categories" component={Categories} />
-        <Route path="/notifications" component={Notifications} />
-        <Route path="/settings" component={Settings} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
-  );
-}
-
-function AppLayout() {
-  const { user, isLoading, signOut } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-          <div className="relative">
-            <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-            <Sparkles className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-lg font-semibold gradient-text-accent">Loading</p>
-            <p className="text-sm text-muted-foreground">Please wait...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <Landing />
-      </Suspense>
-    );
-  }
-
-  const style = {
-    "--sidebar-width": "17rem",
-    "--sidebar-width-icon": "3.5rem",
-  };
-
-  return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Premium Header */}
-          <header className="relative flex items-center justify-between gap-4 px-6 py-4 border-b border-border/50 bg-background/60 backdrop-blur-xl supports-[backdrop-filter]:bg-background/40">
-            {/* Subtle gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/[0.02] via-transparent to-secondary/[0.02] pointer-events-none" />
-            
-            <div className="relative flex items-center gap-3">
-              <SidebarTrigger 
-                className="h-9 w-9 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200" 
-                data-testid="button-sidebar-toggle"
-              >
-                <Menu className="h-4 w-4" />
-              </SidebarTrigger>
-            </div>
-            
-            <div className="relative flex items-center gap-3">
-              <ThemeToggle />
-              {user && (
-                <div className="flex items-center gap-4 pl-4 ml-1 border-l border-border/50">
-                  <div className="flex flex-col text-right">
-                    <span className="text-sm font-semibold">{user.firstName || user.email || 'User'}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg border-border/50 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50 transition-all duration-200"
-                    onClick={() => signOut()}
-                    data-testid="button-signout"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign out
-                  </Button>
-                </div>
-              )}
-            </div>
-          </header>
-          
-          {/* Main Content */}
-          <main className="flex-1 overflow-y-auto">
-            <div className="p-8 animate-fade-in">
-              <AuthenticatedRoutes />
-            </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
-  );
-}
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="physique57-theme">
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <AppLayout />
           <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <GlobalFiltersProvider>
+              <MetricsTablesRegistryProvider>
+                <SectionNavigationProvider>
+                  <AppRoutes />
+                </SectionNavigationProvider>
+              </MetricsTablesRegistryProvider>
+            </GlobalFiltersProvider>
+          </BrowserRouter>
         </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
-}
+};
 
 export default App;
